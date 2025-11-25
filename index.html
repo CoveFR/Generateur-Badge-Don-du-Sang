@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Badge du Donneur de Sang</title>
+    <style>
+        /* CSS pour le style de la page */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #d8001a; /* Couleur du sang */
+            border-bottom: 2px solid #d8001a;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .step {
+            text-align: left;
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        .step h2 {
+            margin-top: 0;
+            color: #d8001a;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #d8001a;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #a80014;
+        }
+        #output {
+            margin-top: 30px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            display: none; /* Caché par défaut */
+        }
+        canvas {
+            border: 1px solid #d8001a;
+            border-radius: 50%;
+            margin-bottom: 15px;
+        }
+        .error {
+            color: #d8001a;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Générateur de Badge du Donneur de Sang</h1>
+
+        <div class="step">
+            <h2>Étape 1 : Valider votre fidélité</h2>
+            <p>Entrez votre identifiant personnel et permanent pour déterminer votre niveau de badge.</p>
+            <input type="text" id="donorId" placeholder="Ex: A-123456">
+            <button onclick="validateId()">Valider l'identifiant</button>
+            <div id="idMessage" class="error"></div>
+        </div>
+
+        <div class="step" id="step2" style="display: none;">
+            <h2>Étape 2 : Téléchargez votre photo</h2>
+            <p>Choisissez la photo de profil sur laquelle appliquer le badge **(<span id="niveauBadge"></span>)**.</p>
+            <input type="file" id="photoUpload" accept="image/*">
+            <button onclick="generateBadge()">Générer ma Photo de Profil</button>
+        </div>
+
+        <div id="output">
+            <h2>Votre Badge est prêt !</h2>
+            <canvas id="badgeCanvas" width="400" height="400"></canvas>
+            <p>Cliquez droit sur l'image ci-dessus et choisissez "Enregistrer l'image sous..." ou utilisez le bouton :</p>
+            <button id="downloadBtn" onclick="downloadImage()">Télécharger ma photo</button>
+        </div>
+    </div>
+
+    <script>
+        // Le niveau de l'utilisateur déterminé par l'Identifiant (1, 2 ou 3)
+        let userLevel = 0; 
+        const canvas = document.getElementById('badgeCanvas');
+        const ctx = canvas.getContext('2d');
+
+        /**
+         * SIMULATION DE LA BASE DE DONNÉES / VÉRIFICATION DE L'IDENTIFIANT
+         * Cette fonction simule la connexion à une base de données et
+         * attribue un niveau en fonction de l'Identifiant entré.
+         */
+        function validateId() {
+            const donorId = document.getElementById('donorId').value.trim().toUpperCase();
+            const idMessage = document.getElementById('idMessage');
+            const step2 = document.getElementById('step2');
+            const niveauBadgeSpan = document.getElementById('niveauBadge');
+
+            idMessage.textContent = '';
+            userLevel = 0;
+            step2.style.display = 'none';
+            document.getElementById('output').style.display = 'none';
+
+            if (!donorId) {
+                idMessage.textContent = "Veuillez entrer votre identifiant.";
+                return;
+            }
+
+            // Logique de simulation :
+            if (donorId.includes('NIVEAU1')) {
+                userLevel = 1;
+            } else if (donorId.includes('NIVEAU2')) {
+                userLevel = 2;
+            } else if (donorId.includes('NIVEAU3')) {
+                userLevel = 3;
+            } else {
+                // Identifiants par défaut pour la démo
+                const defaultLevels = {
+                    'A-123456': 1, // Exemple Niveau 1
+                    'B-987654': 2, // Exemple Niveau 2
+                    'C-112233': 3  // Exemple Niveau 3
+                };
+                userLevel = defaultLevels[donorId] || 0;
+            }
+            
+            // Affichage du résultat de la validation
+            if (userLevel > 0) {
+                idMessage.textContent = `Identifiant "${donorId}" validé ! Votre niveau est : ${userLevel}.`;
+                idMessage.style.color = 'green';
+                niveauBadgeSpan.textContent = `Niveau ${userLevel}`;
+                step2.style.display = 'block';
+            } else {
+                idMessage.textContent = "Identifiant non trouvé ou invalide. Veuillez réessayer.";
+            }
+        }
+
+        /**
+         * Fonction principale pour générer l'image fusionnée sur le Canvas.
+         */
+        function generateBadge() {
+            if (userLevel === 0) {
+                alert("Veuillez valider votre identifiant à l'étape 1 d'abord.");
+                return;
+            }
+
+            const photoInput = document.getElementById('photoUpload');
+            const outputDiv = document.getElementById('output');
+            
+            if (photoInput.files.length === 0) {
+                alert("Veuillez sélectionner une photo de profil.");
+                return;
+            }
+
+            // Récupère la photo utilisateur
+            const photoFile = photoInput.files[0];
+            const photoURL = URL.createObjectURL(photoFile);
+            
+            // Chemin de l'ornement basé sur le niveau
+            const ornementPath = `ornement_niveau${userLevel}.png`;
+
+            const userPhoto = new Image();
+            userPhoto.onload = () => {
+                const ornementImg = new Image();
+                ornementImg.onload = () => {
+                    // 1. Dessiner la photo utilisateur (carrée)
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Assurer que la photo remplisse le canvas (couper si nécessaire)
+                    const size = Math.min(userPhoto.width, userPhoto.height);
+                    const sx = (userPhoto.width - size) / 2;
+                    const sy = (userPhoto.height - size) / 2;
+                    
+                    ctx.drawImage(userPhoto, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
+                    
+                    // 2. Créer un masque circulaire (pour simuler une photo de profil)
+                    ctx.globalCompositeOperation = 'destination-in';
+                    ctx.beginPath();
+                    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over'; // Réinitialiser
+
+                    // 3. Dessiner l'ornement par-dessus
+                    ctx.drawImage(ornementImg, 0, 0, canvas.width, canvas.height);
+
+                    outputDiv.style.display = 'block';
+                    window.location.hash = 'output'; // Défilement vers le résultat
+                };
+                ornementImg.onerror = () => {
+                    alert(`Erreur: Impossible de charger l'ornement à l'adresse "${ornementPath}". Vérifiez le nom du fichier et son emplacement.`);
+                };
+                ornementImg.src = ornementPath;
+            };
+
+            userPhoto.onerror = () => {
+                alert("Erreur: Impossible de charger la photo sélectionnée.");
+            };
+            userPhoto.src = photoURL;
+        }
+
+        /**
+         * Fonction pour le téléchargement direct de l'image Canvas.
+         */
+        function downloadImage() {
+            const image = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
+            const link = document.createElement('a');
+            link.download = 'photo_profil_donneur_badge.png';
+            link.href = image;
+            link.click();
+        }
+    </script>
+
+</body>
+</html>
